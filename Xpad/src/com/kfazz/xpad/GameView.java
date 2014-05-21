@@ -38,6 +38,19 @@ import java.util.Random;
  * @see GameControllerInput
  */
 public class GameView extends View {
+	private int gameMode;  /* Game mode variable.
+								 * 0: stationary rock shooting
+								 * 1: asteroid field avoidance
+								 * 2: DRIFTMANIA!
+								 */
+	
+	private int[][] colors = 	// Colors for players
+								   {{255, 63, 255, 63},
+									{255, 0, 91, 255},  //light blue
+									{255, 255, 165, 0}, //orange
+									{255, 173, 255, 7}, //yellow green
+									{255, 255, 0, 0}};  //red
+	
 	private final long ANIMATION_TIME_STEP = 1000 / 60;
 	private final int MAX_OBSTACLES = 12;
 
@@ -104,6 +117,8 @@ public class GameView extends View {
 
 		mBullets = new ArrayList<Bullet>();
 		mObstacles = new ArrayList<Obstacle>();
+		
+		gameMode = 0;
 
 		setFocusable(true);
 
@@ -117,7 +132,7 @@ public class GameView extends View {
 		mMaxShipSpeed = baseSpeed * 12;
 
 		mBulletSize = baseSize;
-		mBulletSpeed = baseSpeed * 12;
+		mBulletSpeed = baseSpeed * 14;
 
 		mMinObstacleSize = baseSize * 2;
 		mMaxObstacleSize = baseSize * 12;
@@ -135,8 +150,9 @@ public class GameView extends View {
 
 	//player fired bullets store who fired them
 	private void fire(int id) {
-		if (mShips[id] != null && !mShips[id].isDestroyed()) {
+		if (mShips[id] != null && !mShips[id].isFiring && !mShips[id].isDestroyed()) {
 			Bullet bullet = new Bullet(id);
+			mShips[id].isFiring = true;
 			bullet.setPosition(mShips[id].getBulletInitialX(), mShips[id].getBulletInitialY());
 			bullet.setVelocity(mShips[id].getBulletVelocityX(mBulletSpeed),
 					mShips[id].getBulletVelocityY(mBulletSpeed));
@@ -201,6 +217,8 @@ public class GameView extends View {
 
 			mShips[id].setHeading(x, (y * -1)); // y axis is inverted
 		}
+		
+		if(!mShips[id].isFiring){
 		if (msg.get_a())
 			fire(msg.get_id());
 		//support firing with right joystick
@@ -216,16 +234,30 @@ public class GameView extends View {
 				ry = (float) ((float)(msg.get_ry()-32768.0)/32768.0 * -1);//get_lx is 0 - 65535 we need -1 to +1
 
 			if (pythag(rx,ry)>0.3) {
-				if (mShips[id] != null && !mShips[id].isDestroyed()) {
+				if (mShips[id] != null  && !mShips[id].isDestroyed()) {
+					mShips[id].isFiring = true;
 					Bullet bullet = new Bullet(id);
 
 					bullet.setPosition(mShips[id].getBulletInitRX(rx),mShips[id].getBulletInitRY(ry));
 					bullet.setVelocity(mShips[id].getBulletVeloRX(rx, ry),mShips[id].getBulletVeloRY(rx,ry));
 					mBullets.add(bullet);
 				}
+				/* Fire!
+				if (mShips[id] != null && !mShips[id].isDestroyed()) {
+					Bullet bullet = new Bullet(id);
+					bullet.setPosition(mShips[id].getBulletInitialX(), mShips[id].getBulletInitialY());
+					bullet.setVelocity(mShips[id].getBulletVelocityX(mBulletSpeed),
+							mShips[id].getBulletVelocityY(mBulletSpeed));
+					mBullets.add(bullet);
+				}
+				*/
 			}
 
 		}
+		}
+		else if(!msg.get_a() && !(pythag((float)((float)(msg.get_rx()-32768.0)/32768.0), (float) ((float)(msg.get_ry()-32768.0)/32768.0 * -1)) > .3))
+			mShips[id].isFiring = false;
+		
 		step(SystemClock.uptimeMillis());
 	}
 
@@ -426,7 +458,8 @@ public class GameView extends View {
 		for (int i = 0; i < numShips; i++){
 			if (mScores[i]!=null) 
 			{	
-				scorePaint.setColor(Color.WHITE);
+				
+				scorePaint.setARGB(colors[i][0], colors[i][1], colors[i][2], colors[i][3]);
 				scorePaint.setTextSize(20);
 				canvas.drawText("Player " + i + "Score :" + mScores[i], 10, 25*i, scorePaint);
 			}
@@ -547,11 +580,13 @@ public class GameView extends View {
 		private float mHeadingMagnitude;
 		private final Paint mPaint;
 		private final Path mPath;
-
+		
+		
 		public XpadEventMsg last;
-
+		public boolean isFiring;
 
 		public Ship() {
+			
 			mPaint = new Paint();
 			mPaint.setStyle(Style.FILL);
 
@@ -567,6 +602,8 @@ public class GameView extends View {
 			mPath.lineTo((float)Math.cos(CORNER_ANGLE) * mSize,
 					(float)Math.sin(CORNER_ANGLE) * mSize);
 			mPath.lineTo(0, 0);
+			
+			isFiring = false;
 		}
 
 		public void setHeadingX(float x) {
@@ -611,12 +648,13 @@ public class GameView extends View {
 		//added for right joystick firing
 		public float getBulletInitRX(float rx)
 		{
-			return mPositionX + (float) Math.cos(rx) * mSize;
+			return mPositionX + (float) rx * mSize;
+			
 		}
 
 		public float getBulletInitRY(float ry)
 		{
-			return mPositionY + (float) Math.sin(ry) * mSize;
+			return mPositionY + (float) ry * mSize;
 		}
 
 		public float getBulletVeloRX(float rx, float ry)
@@ -660,8 +698,9 @@ public class GameView extends View {
 		}
 
 		public void draw(Canvas canvas) {
+			int mPlayerId = last.get_id();
 			setPaintARGBBlend(mPaint, mDestroyAnimProgress,
-					255, 63, 255, 63,
+					colors[mPlayerId][0], colors[mPlayerId][1], colors[mPlayerId][2], colors[mPlayerId][3],
 					0, 255, 0, 0);
 
 			canvas.save(Canvas.MATRIX_SAVE_FLAG);
@@ -714,8 +753,13 @@ public class GameView extends View {
 
 		public void draw(Canvas canvas) {
 			setPaintARGBBlend(mPaint, mDestroyAnimProgress,
-					255, 255, 255, (255/(mPlayerId+1)),
+					colors[mPlayerId][0], colors[mPlayerId][1], colors[mPlayerId][2], colors[mPlayerId][3],
 					0, 255, 255, 255);
+			
+			/*
+			setPaintARGBBlend(mPaint, mDestroyAnimProgress,
+					255, 255, 255, (255/(mPlayerId+1)),
+					0, 255, 255, 255);*/ //white bullets
 			canvas.drawCircle(mPositionX, mPositionY, mSize, mPaint);
 		}
 
