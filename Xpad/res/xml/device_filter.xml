@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 0x045e / 0x028e "Microsoft X-Box 360 pad" -->
+    <usb-device vendor-id="1118" product-id="654" />
+    
+    <!--  0x045e/ 0x0291 "Xbox 360 Wireless Receiver (XBOX)" -->
+    <usb-device vendor-id="1118" product-id="657" />
+
+    <!-- 0x045e, 0x0719, "Xbox 360 Wireless Receiver" -->
+    <usb-device vendor-id="1118" product-id="1817"/>
+
+    <!--  0x0f0d, 0x000d, "Hori Fighting Stick EX2"  -->
+    <usb-device vendor-id="3853" product-id="13" />
+
+</resources>
