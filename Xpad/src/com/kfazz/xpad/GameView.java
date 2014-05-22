@@ -22,6 +22,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Paint.Style;
+import android.graphics.Rect;
 import android.os.Handler;
 import android.os.SystemClock;
 import android.util.AttributeSet;
@@ -421,6 +422,8 @@ public class GameView extends View {
 			float velocityY = (float) Math.sin(direction) * speed;
 
 			Obstacle obstacle = new Obstacle();
+			if (mRandom.nextBoolean())
+				obstacle = new Enemy(); //test Enemy class
 			obstacle.setPosition(positionX, positionY);
 			obstacle.setSize(size);
 			obstacle.setVelocity(velocityX, velocityY);
@@ -770,7 +773,7 @@ public class GameView extends View {
 	}
 
 	private class Obstacle extends Sprite {
-		private final Paint mPaint;
+		protected final Paint mPaint;
 
 		public Obstacle() {
 			mPaint = new Paint();
@@ -798,6 +801,41 @@ public class GameView extends View {
 		@Override
 		public float getDestroyAnimDuration() {
 			return 0.25f;
+		}
+	}
+
+	private class Enemy extends Obstacle
+	{
+		protected final Paint mPaint; //overrides parents, 
+									  //final per instantiated class?
+		public Enemy() {
+		mPaint = new Paint();
+		mPaint.setARGB(255, 127, 255, 127);
+		mPaint.setStyle(Style.FILL_AND_STROKE);
+	}
+		@Override
+		public boolean step(float tau) {
+			//FIXME seek nearest player
+			mPositionX += mVelocityX * tau;
+			mPositionY += mVelocityY * tau;
+
+			if (mDestroyed) {
+				mDestroyAnimProgress += tau / getDestroyAnimDuration();
+				if (mDestroyAnimProgress >= 1.0f) {
+					return false;
+				}
+			}
+			return true;
+		}
+		
+		@Override
+		public void draw (Canvas canvas)
+		{
+			setPaintARGBBlend(mPaint, mDestroyAnimProgress,
+					255, 127, 255, 127,
+					0, 255, 0, 0);
+			canvas.drawRect(mPositionX-25, mPositionY-25,
+					mPositionX+25, mPositionY+25,mPaint);
 		}
 	}
 }
