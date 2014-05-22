@@ -61,7 +61,8 @@ public class GameView extends View {
 
 	private final long FIRE_DELAY = 100; //time between firings
 	private final long M2_TRAVEL_SPEED = 120; //asteroid field travel speed ;-)
-	private final float DECELLERATION_FACTOR = (float)-.007; //should be negative
+	private final float DECELLERATION_FACTOR = -.007f; //should be negative
+	private final float REL_SPEED_FACTOR = .5f;
 	
 	private final Random mRandom;
 	//Support multiple players
@@ -736,8 +737,8 @@ public class GameView extends View {
 			float yPos = (float) (origin.mPositionY + Math.sin(angle) * origin.mSize);
 			setPosition(xPos,yPos);
 			
-			float xSpeed = (float) (.5 * origin.mVelocityX + Math.cos(angle) * velocity);
-			float ySpeed = (float) (.5 * origin.mVelocityY + Math.sin(angle) * velocity);
+			float xSpeed = (float) (REL_SPEED_FACTOR * origin.mVelocityX + Math.cos(angle) * velocity);
+			float ySpeed = (float) (REL_SPEED_FACTOR * origin.mVelocityY + Math.sin(angle) * velocity);
 			setVelocity(xSpeed,ySpeed);
 			
 			setSize(mBulletSize);
