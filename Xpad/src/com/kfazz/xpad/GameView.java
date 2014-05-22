@@ -155,7 +155,8 @@ public class GameView extends View {
 	//player fired bullets store who fired them
 	private void fire(int id) {
 		
-		if (mShips[id] != null && !mShips[id].isFiring && !mShips[id].isDestroyed()) {
+		if (mShips[id] != null //&& !mShips[id].isFiring 
+				&& !mShips[id].isDestroyed()) {
 			Bullet bullet = new Bullet(id);
 			mShips[id].lastFire = System.currentTimeMillis();
 			bullet.setPosition(mShips[id].getBulletInitialX(), mShips[id].getBulletInitialY());
@@ -412,7 +413,11 @@ public class GameView extends View {
 					break;
 				case 1:
 					positionX = getWidth() + size;
-					positionY = mRandom.nextInt(getHeight());
+					if(gameMode == 1){
+						positionY = mRandom.nextInt(getHeight());
+					}
+					else
+						positionY = mRandom.nextInt(getHeight());
 					break;
 				case 2:
 					positionX = mRandom.nextInt(getWidth());
@@ -436,7 +441,7 @@ public class GameView extends View {
 			
 			float yOffset;
 			if(gameMode == 1)
-				yOffset = 80;
+				yOffset = 120;
 			else
 				yOffset = 0;
 				
