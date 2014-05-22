@@ -22,6 +22,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Paint.Style;
+import android.graphics.Rect;
 import android.os.Handler;
 import android.os.SystemClock;
 import android.util.AttributeSet;
@@ -782,7 +783,7 @@ public class GameView extends View {
 	}
 
 	private class Obstacle extends Sprite {
-		private final Paint mPaint;
+		protected final Paint mPaint;
 
 		public Obstacle() {
 			mPaint = new Paint();
@@ -810,6 +811,64 @@ public class GameView extends View {
 		@Override
 		public float getDestroyAnimDuration() {
 			return 0.25f;
+		}
+	}
+
+	private class Enemy extends Obstacle
+	{
+		protected final Paint mPaint; //overrides parents, 
+									  //final per instantiated class?
+		public Enemy() {
+		mPaint = new Paint();
+		mPaint.setARGB(255, 127, 255, 127);
+		mPaint.setStyle(Style.FILL_AND_STROKE);
+	}
+		@Override
+		public boolean step(float tau) {
+			//FIXME seek nearest player
+			//min 
+			float dist = 250; //TODO pick a better number :)
+			int target = 0;
+			for (int i = 1; i < MAX_PLAYERS; i++)
+			{
+				if (mShips[i]!=null)
+				{
+					float sdist = distanceTo(mShips[i].mPositionX, mShips[i].mPositionY);
+					if (sdist<dist) //target in range?
+					{
+						dist = sdist;
+						target = i;
+					}
+				}
+			}
+				
+			//if target !=0 twiddle the velocity
+			if (target !=0)
+			{
+				double darct = Math.atan2(mShips[target].mPositionY,mShips[target].mPositionX);
+					mVelocityX = (float) (- Math.cos(darct) * mBulletSpeed /2);
+					mVelocityY = (float) ( Math.sin(darct) * mBulletSpeed /2 );
+			}
+			mPositionX += mVelocityX * tau;
+			mPositionY += mVelocityY * tau;
+
+			if (mDestroyed) {
+				mDestroyAnimProgress += tau / getDestroyAnimDuration();
+				if (mDestroyAnimProgress >= 1.0f) {
+					return false;
+				}
+			}
+			return true;
+		}
+		
+		@Override
+		public void draw (Canvas canvas)
+		{
+			setPaintARGBBlend(mPaint, mDestroyAnimProgress,
+					255, 127, 255, 127,
+					0, 255, 0, 0);
+			canvas.drawRect(mPositionX-25, mPositionY-25,
+					mPositionX+25, mPositionY+25,mPaint);
 		}
 	}
 }
