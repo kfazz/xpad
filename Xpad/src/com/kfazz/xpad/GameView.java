@@ -39,7 +39,7 @@ import java.util.Random;
  * @see GameControllerInput
  */
 public class GameView extends View {
-	private int gameMode;  /* Game mode variable.
+	private static int gameMode;  /* Game mode variable.
 								 * 0: stationary rock shooting
 								 * 1: asteroid field avoidance
 								 * 2: DRIFTMANIA!
@@ -257,9 +257,14 @@ public class GameView extends View {
 			
 
 		}
-		
 		mShips[id].isFiring = aFiring || jFiring;
 		
+		if(msg.get_back()){
+			if(gameMode == 2)
+				gameMode = 0;
+			else 
+				gameMode++;
+		}
 		
 		step(SystemClock.uptimeMillis());
 	}
@@ -428,8 +433,15 @@ public class GameView extends View {
 			float direction = mRandom.nextFloat() * (float) Math.PI * 2;
 			float speed = mRandom.nextFloat() * (mMaxObstacleSpeed - mMinObstacleSpeed)
 					+ mMinObstacleSpeed;
+			
+			float yOffset;
+			if(gameMode == 1)
+				yOffset = 80;
+			else
+				yOffset = 0;
+				
 			float velocityX = (float) Math.cos(direction) * speed;
-			float velocityY = (float) Math.sin(direction) * speed;
+			float velocityY = (float) Math.sin(direction) * speed + yOffset;
 
 			Obstacle obstacle = new Obstacle();
 			obstacle.setPosition(positionX, positionY);
@@ -475,6 +487,10 @@ public class GameView extends View {
 				canvas.drawText("Player " + i + "Score :" + mScores[i], 10, 25*i, scorePaint);
 			}
 		}
+		
+		scorePaint.setColor(Color.GREEN);
+		scorePaint.setTextSize(20);
+		canvas.drawText("Mode: " + GameView.gameMode , canvas.getWidth() - 100, 25, scorePaint);
 	}
 
 	static float pythag(float x, float y) {
