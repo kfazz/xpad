@@ -58,6 +58,8 @@ public class GameView extends View {
 	//need to seperate player id and controller id, use max of
 	// 4 actual players regardless of how the controllrs enumerate.
 
+	private final long FIRE_DELAY = 100; //time between firings
+	
 	private final Random mRandom;
 	//Support multiple players
 	private Ship[] mShips;
@@ -96,6 +98,7 @@ public class GameView extends View {
 		    mShips[mId].last.rumble((byte)0x00,  (byte)(0x00));
 		  }
 		}
+
 	
 	//Handler Postdelayed method runs runnable after certain amount of milliseconds
 	private Handler handler = new Handler();
@@ -150,14 +153,16 @@ public class GameView extends View {
 
 	//player fired bullets store who fired them
 	private void fire(int id) {
+		
 		if (mShips[id] != null && !mShips[id].isFiring && !mShips[id].isDestroyed()) {
 			Bullet bullet = new Bullet(id);
-			mShips[id].isFiring = true;
+			mShips[id].lastFire = System.currentTimeMillis();
 			bullet.setPosition(mShips[id].getBulletInitialX(), mShips[id].getBulletInitialY());
 			bullet.setVelocity(mShips[id].getBulletVelocityX(mBulletSpeed),
 					mShips[id].getBulletVelocityY(mBulletSpeed));
 			mBullets.add(bullet);
 		}
+		
 	}
 
 	private void game_over() {
@@ -218,9 +223,12 @@ public class GameView extends View {
 			mShips[id].setHeading(x, (y * -1)); // y axis is inverted
 		}
 		
-		if(!mShips[id].isFiring){
-		if (msg.get_a())
+		boolean aFiring = false;
+		boolean jFiring = false;
+		
+		if (aFiring = msg.get_a())
 			fire(msg.get_id());
+			
 		//support firing with right joystick
 		else {
 			float rx, ry;
@@ -233,32 +241,34 @@ public class GameView extends View {
 			else
 				ry = (float) ((float)(msg.get_ry()-32768.0)/32768.0 * -1);//get_lx is 0 - 65535 we need -1 to +1
 
-			if (pythag(rx,ry)>0.3) {
-				if (mShips[id] != null  && !mShips[id].isDestroyed()) {
-					mShips[id].isFiring = true;
+			
+			if (jFiring = pythag(rx,ry)>0.3) {
+				
+				if (mShips[id] != null  && !mShips[id].isFiring && !mShips[id].isDestroyed()) {
+					
 					Bullet bullet = new Bullet(id);
-
+					mShips[id].lastFire = System.currentTimeMillis();
 					bullet.setPosition(mShips[id].getBulletInitRX(rx),mShips[id].getBulletInitRY(ry));
 					bullet.setVelocity(mShips[id].getBulletVeloRX(rx, ry),mShips[id].getBulletVeloRY(rx,ry));
 					mBullets.add(bullet);
 				}
-				/* Fire!
-				if (mShips[id] != null && !mShips[id].isDestroyed()) {
-					Bullet bullet = new Bullet(id);
-					bullet.setPosition(mShips[id].getBulletInitialX(), mShips[id].getBulletInitialY());
-					bullet.setVelocity(mShips[id].getBulletVelocityX(mBulletSpeed),
-							mShips[id].getBulletVelocityY(mBulletSpeed));
-					mBullets.add(bullet);
-				}
-				*/
 			}
+			
 
 		}
-		}
-		else if(!msg.get_a() && !(pythag((float)((float)(msg.get_rx()-32768.0)/32768.0), (float) ((float)(msg.get_ry()-32768.0)/32768.0 * -1)) > .3))
-			mShips[id].isFiring = false;
+		
+		mShips[id].isFiring = aFiring || jFiring;
+		
 		
 		step(SystemClock.uptimeMillis());
+	}
+	
+	
+	private void fireRepeat(int ship){
+		
+
+		
+			
 	}
 
 	@Override
@@ -583,6 +593,7 @@ public class GameView extends View {
 		
 		
 		public XpadEventMsg last;
+		public long lastFire;
 		public boolean isFiring;
 
 		public Ship() {
@@ -603,6 +614,7 @@ public class GameView extends View {
 					(float)Math.sin(CORNER_ANGLE) * mSize);
 			mPath.lineTo(0, 0);
 			
+			lastFire = 0;
 			isFiring = false;
 		}
 
