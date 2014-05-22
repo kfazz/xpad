@@ -60,6 +60,8 @@ public class GameView extends View {
 	// 4 actual players regardless of how the controllrs enumerate.
 
 	private final long FIRE_DELAY = 100; //time between firings
+	private final long M2_TRAVEL_SPEED = 120; //asteroid field travel speed ;-)
+	private final float DECELLERATION_FACTOR = (float)-.007; //should be negative
 	
 	private final Random mRandom;
 	//Support multiple players
@@ -88,6 +90,8 @@ public class GameView extends View {
 	private float mMaxObstacleSize;
 	private float mMinObstacleSpeed;
 	private float mMaxObstacleSpeed;
+	
+	private boolean backPress;
 
 	public class MyRunnable implements Runnable {
 		  private int mId;
@@ -123,6 +127,7 @@ public class GameView extends View {
 		mObstacles = new ArrayList<Obstacle>();
 		
 		gameMode = 0;
+		backPress = false;
 
 		setFocusable(true);
 
@@ -132,11 +137,11 @@ public class GameView extends View {
 		float baseSpeed = baseSize * 3;
 
 		mShipSize = baseSize * 3;
-		mMaxShipThrust = baseSpeed * 0.25f;
-		mMaxShipSpeed = baseSpeed * 12;
+		mMaxShipThrust = baseSpeed * 0.4f;
+		mMaxShipSpeed = baseSpeed * 14;
 
 		mBulletSize = baseSize;
-		mBulletSpeed = baseSpeed * 14;
+		mBulletSpeed = baseSpeed * 16;
 
 		mMinObstacleSize = baseSize * 2;
 		mMaxObstacleSize = baseSize * 12;
@@ -149,25 +154,11 @@ public class GameView extends View {
 		super.onSizeChanged(w, h, oldw, oldh);
 
 		// Reset the game when the view changes size.
-		game_over();
+		reset();
 	}
 
-	//player fired bullets store who fired them
-	private void fire(int id) {
-		
-		if (mShips[id] != null //&& !mShips[id].isFiring 
-				&& !mShips[id].isDestroyed()) {
-			Bullet bullet = new Bullet(id);
-			mShips[id].lastFire = System.currentTimeMillis();
-			bullet.setPosition(mShips[id].getBulletInitialX(), mShips[id].getBulletInitialY());
-			bullet.setVelocity(mShips[id].getBulletVelocityX(mBulletSpeed),
-					mShips[id].getBulletVelocityY(mBulletSpeed));
-			mBullets.add(bullet);
-		}
-		
-	}
 
-	private void game_over() {
+	private void reset() {
 		for (int i = 0; i < MAX_PLAYERS; i++) {
 			mShips[i]=null;
 			if (mScores[i]!=null)
@@ -225,12 +216,17 @@ public class GameView extends View {
 			mShips[id].setHeading(x, (y * -1)); // y axis is inverted
 		}
 		
-		boolean aFiring = false;
-		boolean jFiring = false;
+		long elapsedTime = System.currentTimeMillis() - mShips[id].lastFire;
+				
+		//fire with a
+		if (msg.get_a()){
+			if (mShips[id] != null  && elapsedTime > FIRE_DELAY && !mShips[id].isDestroyed()){
+				Bullet bullet = new Bullet(mShips[id], mBulletSpeed);
+				mShips[id].lastFire = System.currentTimeMillis();
+				mBullets.add(bullet);
+			}
+		}
 		
-		if (aFiring = msg.get_a())
-			fire(msg.get_id());
-			
 		//support firing with right joystick
 		else {
 			float rx, ry;
@@ -242,41 +238,31 @@ public class GameView extends View {
 				ry = -1;	//skip div by zero
 			else
 				ry = (float) ((float)(msg.get_ry()-32768.0)/32768.0 * -1);//get_lx is 0 - 65535 we need -1 to +1
-
-			
-			if (jFiring = pythag(rx,ry)>0.3) {
-				
-				if (mShips[id] != null  && !mShips[id].isFiring && !mShips[id].isDestroyed()) {
+		
+			if (pythag(rx,ry)>0.3 && mShips[id] != null && elapsedTime > FIRE_DELAY && !mShips[id].isDestroyed()) {
 					
-					Bullet bullet = new Bullet(id);
-					mShips[id].lastFire = System.currentTimeMillis();
-					bullet.setPosition(mShips[id].getBulletInitRX(rx),mShips[id].getBulletInitRY(ry));
-					bullet.setVelocity(mShips[id].getBulletVeloRX(rx, ry),mShips[id].getBulletVeloRY(rx,ry));
-					mBullets.add(bullet);
-				}
+				Bullet bullet = new Bullet(mShips[id], (float)Math.atan2(ry, rx), mBulletSpeed);
+				mShips[id].lastFire = System.currentTimeMillis();
+				mBullets.add(bullet);
 			}
-			
-
 		}
-		mShips[id].isFiring = aFiring || jFiring;
 		
 		if(msg.get_back()){
-			if(gameMode == 2)
-				gameMode = 0;
-			else 
-				gameMode++;
+			if(!backPress){
+				if(gameMode >= 2)
+					gameMode = 0;
+				else 
+					gameMode++;
+				
+				reset();
+			}
+			backPress = true;
 		}
+		else backPress = false;
 		
 		step(SystemClock.uptimeMillis());
 	}
 	
-	
-	private void fireRepeat(int ship){
-		
-
-		
-			
-	}
 
 	@Override
 	public void onWindowFocusChanged(boolean hasWindowFocus) {
@@ -398,7 +384,11 @@ public class GameView extends View {
 
 		// Spawn more obstacles offscreen when needed.
 		// Avoid putting them right on top of the ship.
-		OuterLoop: while (mObstacles.size() < MAX_OBSTACLES) {
+		int obstacleCap = MAX_OBSTACLES;  //TODO: This is very ghetto
+		if(gameMode == 1)
+			obstacleCap = (int)(MAX_OBSTACLES * 1.9);
+		
+		OuterLoop: while (mObstacles.size() < obstacleCap) {
 			final float minDistance = mShipSize * 4;
 			float size = mRandom.nextFloat() * (mMaxObstacleSize - mMinObstacleSize)
 					+ mMinObstacleSize;
@@ -439,16 +429,17 @@ public class GameView extends View {
 			float speed = mRandom.nextFloat() * (mMaxObstacleSpeed - mMinObstacleSpeed)
 					+ mMinObstacleSpeed;
 			
-			float yOffset;
-			if(gameMode == 1)
-				yOffset = 120;
-			else
-				yOffset = 0;
+
 				
 			float velocityX = (float) Math.cos(direction) * speed;
-			float velocityY = (float) Math.sin(direction) * speed + yOffset;
+			float velocityY = (float) Math.sin(direction) * speed;
 
-			Obstacle obstacle = new Obstacle();
+			Obstacle obstacle;
+			if(gameMode == 2) 
+				obstacle = new Enemy();
+			else
+				obstacle = new Obstacle();
+			
 			obstacle.setPosition(positionX, positionY);
 			obstacle.setSize(size);
 			obstacle.setVelocity(velocityX, velocityY);
@@ -493,6 +484,7 @@ public class GameView extends View {
 			}
 		}
 		
+		//draw game mode for debugging
 		scorePaint.setColor(Color.GREEN);
 		scorePaint.setTextSize(20);
 		canvas.drawText("Mode: " + GameView.gameMode , canvas.getWidth() - 100, 25, scorePaint);
@@ -554,10 +546,16 @@ public class GameView extends View {
 		public boolean isDestroyed() {
 			return mDestroyed;
 		}
+		
+		
 
 		public boolean step(float tau) {
+			float yOffset = 0;
+			if(gameMode == 1)
+				yOffset = M2_TRAVEL_SPEED;
+			
 			mPositionX += mVelocityX * tau;
-			mPositionY += mVelocityY * tau;
+			mPositionY += (mVelocityY + yOffset) * tau;
 
 			if (mDestroyed) {
 				mDestroyAnimProgress += tau / getDestroyAnimDuration();
@@ -616,7 +614,6 @@ public class GameView extends View {
 		
 		public XpadEventMsg last;
 		public long lastFire;
-		public boolean isFiring;
 
 		public Ship() {
 			
@@ -637,7 +634,6 @@ public class GameView extends View {
 			mPath.lineTo(0, 0);
 			
 			lastFire = 0;
-			isFiring = false;
 		}
 
 		public void setHeadingX(float x) {
@@ -663,56 +659,16 @@ public class GameView extends View {
 			}
 		}
 
-		private float polarX(float radius) {
-			return (float) Math.cos(mHeadingAngle) * radius;
-		}
-
-		private float polarY(float radius) {
-			return (float) Math.sin(mHeadingAngle) * radius;
-		}
-
-		public float getBulletInitialX() {
-			return mPositionX + polarX(mSize);
-		}
-
-		public float getBulletInitialY() {
-			return mPositionY + polarY(mSize);
-		}
-
-		//added for right joystick firing
-		public float getBulletInitRX(float rx)
-		{
-			return mPositionX + (float) rx * mSize;
-			
-		}
-
-		public float getBulletInitRY(float ry)
-		{
-			return mPositionY + (float) ry * mSize;
-		}
-
-		public float getBulletVeloRX(float rx, float ry)
-		{
-			return (float) (mVelocityX + Math.cos(Math.atan2(ry, rx)) * mBulletSpeed);
-		}
-		public float getBulletVeloRY(float rx, float ry)
-		{
-			return (float) (mVelocityY + Math.sin(Math.atan2(ry, rx)) * mBulletSpeed);
-		}
-		//end add
-
-		public float getBulletVelocityX(float relativeSpeed) {
-			return mVelocityX + polarX(relativeSpeed);
-		}
-
-		public float getBulletVelocityY(float relativeSpeed) {
-			return mVelocityY + polarY(relativeSpeed);
-		}
-
 		public void accelerate(float tau, float maxThrust, float maxSpeed) {
-			final float thrust = mHeadingMagnitude * maxThrust;
-			mVelocityX += polarX(thrust);
-			mVelocityY += polarY(thrust);
+			float thrust = mHeadingMagnitude * maxThrust;
+			if(mHeadingMagnitude > 0){
+				mVelocityX += Math.cos(mHeadingAngle) * thrust;
+				mVelocityY += Math.sin(mHeadingAngle) * thrust;
+			}
+			else{
+				mVelocityX += mVelocityX * DECELLERATION_FACTOR;
+				mVelocityY += mVelocityY * DECELLERATION_FACTOR;
+			}
 
 			final float speed = pythag(mVelocityX, mVelocityY);
 			if (speed > maxSpeed) {
@@ -727,6 +683,7 @@ public class GameView extends View {
 			if (!super.step(tau)) {
 				return false;
 			}
+
 			wrapAtPlayfieldBoundary();
 			return true;
 		}
@@ -735,7 +692,7 @@ public class GameView extends View {
 			int mPlayerId = last.get_id();
 			setPaintARGBBlend(mPaint, mDestroyAnimProgress,
 					colors[mPlayerId][0], colors[mPlayerId][1], colors[mPlayerId][2], colors[mPlayerId][3],
-					0, 255, 0, 0);
+					0, 100, 0, 0);
 
 			canvas.save(Canvas.MATRIX_SAVE_FLAG);
 			canvas.translate(mPositionX, mPositionY);
@@ -764,12 +721,25 @@ public class GameView extends View {
 			setSize(mBulletSize);
 			mPlayerId = 0;
 		}
+		
+		public Bullet(Ship origin, float velocity){ //convenience for a button
+			this(origin, origin.mHeadingAngle, velocity);
+		}
 
-		public Bullet(int id) {
+		public Bullet(Ship origin, float angle, float velocity) {
 			mPaint = new Paint();
 			mPaint.setStyle(Style.FILL);
-			mPlayerId = id;
-
+			mPlayerId = origin.last.get_id(); // this is an issue otherwise could be sprite
+											  // just have to check type of sprite here
+			
+			float xPos = (float) (origin.mPositionX + Math.cos(angle)* origin.mSize);
+			float yPos = (float) (origin.mPositionY + Math.sin(angle) * origin.mSize);
+			setPosition(xPos,yPos);
+			
+			float xSpeed = (float) (.5 * origin.mVelocityX + Math.cos(angle) * velocity);
+			float ySpeed = (float) (.5 * origin.mVelocityY + Math.sin(angle) * velocity);
+			setVelocity(xSpeed,ySpeed);
+			
 			setSize(mBulletSize);
 		}
 
@@ -848,7 +818,8 @@ public class GameView extends View {
 		public boolean step(float tau) {
 			//FIXME seek nearest player
 			//min 
-			float dist = 250; //TODO pick a better number :)
+
+			float dist = 800; //TODO pick a better number :)
 			int target = 0;
 			for (int i = 1; i < MAX_PLAYERS; i++)
 			{
@@ -862,22 +833,18 @@ public class GameView extends View {
 					}
 				}
 			}
-				
+			
 			//if target !=0 twiddle the velocity
 			if (target !=0)
 			{
-				double darct = Math.atan2(mShips[target].mPositionY,mShips[target].mPositionX);
-					mVelocityX = (float) (- Math.cos(darct) * mBulletSpeed /2);
+				double darct = Math.atan2(mShips[target].mPositionY - mPositionY,mShips[target].mPositionX - mPositionX);
+				
+					mVelocityX = (float) ( Math.cos(darct) * mBulletSpeed /2);
 					mVelocityY = (float) ( Math.sin(darct) * mBulletSpeed /2 );
+					System.out.println( darct + " " + mVelocityX + " " + mVelocityY);
 			}
-			mPositionX += mVelocityX * tau;
-			mPositionY += mVelocityY * tau;
-
-			if (mDestroyed) {
-				mDestroyAnimProgress += tau / getDestroyAnimDuration();
-				if (mDestroyAnimProgress >= 1.0f) {
-					return false;
-				}
+			if (!super.step(tau)) {
+				return false;
 			}
 			return true;
 		}
@@ -888,8 +855,18 @@ public class GameView extends View {
 			setPaintARGBBlend(mPaint, mDestroyAnimProgress,
 					255, 127, 255, 127,
 					0, 255, 0, 0);
-			canvas.drawRect(mPositionX-25, mPositionY-25,
-					mPositionX+25, mPositionY+25,mPaint);
+			canvas.drawRect(mPositionX-mSize, mPositionY-mSize,
+					mPositionX+mSize, mPositionY+mSize,mPaint);
+		}
+		
+		public boolean collidesWith(Sprite other) {
+			// Really bad collision detection.
+			float enemyRadius = other.mSize * 0.5f;
+			
+			return other.mPositionX <= mPositionX+mSize  && other.mPositionX >= mPositionX-mSize &&
+					other.mPositionY <= mPositionY+mSize && other.mPositionY <= mPositionY+mSize ;
+			
+
 		}
 	}
 }
