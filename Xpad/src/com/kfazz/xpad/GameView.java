@@ -93,6 +93,9 @@ public class GameView extends View {
 	private float mMaxObstacleSpeed;
 	
 	private boolean backPress;
+	int highScorePlayer;
+	long highScore;
+	
 
 	public class MyRunnable implements Runnable {
 		  private int mId;
@@ -165,6 +168,8 @@ public class GameView extends View {
 			if (mScores[i]!=null)
 				mScores[i] = (long) 0;
 		}
+		highScorePlayer = 0;
+		highScore = 0;
 		mBullets.clear();
 		mObstacles.clear();
 	}
@@ -474,7 +479,10 @@ public class GameView extends View {
 			obstacle.draw(canvas);
 		}
 
+		
 		//Draw the scores last, so they're on top
+		highScorePlayer = 0;
+		highScore = 0;
 		for (int i = 0; i < numShips; i++){
 			if (mScores[i]!=null) 
 			{	
@@ -482,8 +490,14 @@ public class GameView extends View {
 				scorePaint.setARGB(colors[i][0], colors[i][1], colors[i][2], colors[i][3]);
 				scorePaint.setTextSize(20);
 				canvas.drawText("Player " + i + "Score :" + mScores[i], 10, 25*i, scorePaint);
+				if(mScores[i] > highScore){
+					highScorePlayer = i;
+					highScore = mScores[i];
+				}
 			}
 		}
+		if(highScorePlayer != 0)
+			canvas.drawText("Top: P" + highScorePlayer + ": " + highScore, 10, (numShips + 1) * 25, scorePaint);
 		
 		//draw game mode for debugging
 		scorePaint.setColor(Color.GREEN);
