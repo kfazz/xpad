@@ -220,7 +220,8 @@ public class XpadDevice implements Runnable {
 		else
 		{
 			byte bytes[] = { 0x00, 0x08, 0x00, left,  right, 0x00, 0x00, 0x00 };
-			mConnection.bulkTransfer(epOut, bytes, bytes.length, 500); //synchronous bulk transfer 500ms timeout
+			//FIXME needs more than 500ma from hub
+			//	mConnection.bulkTransfer(epOut, bytes, bytes.length, 500); //synchronous bulk transfer 500ms timeout
 		}
 	}
 

@@ -104,7 +104,8 @@ public class GameView extends View {
 		  }
 
 		  public void run() {
-		    mShips[mId].last.rumble((byte)0x00,  (byte)(0x00));
+			if (mShips[mId]!=null && mShips[mId].last!=null)  
+				mShips[mId].last.rumble((byte)0x00,  (byte)(0x00));
 		  }
 		}
 
@@ -132,6 +133,8 @@ public class GameView extends View {
 		
 		gameMode = 0;
 		backPress = false;
+		highScorePlayer = 0;
+		highScore = 0;
 
 		setFocusable(true);
 
@@ -145,7 +148,7 @@ public class GameView extends View {
 		mMaxShipSpeed = baseSpeed * 14;
 
 		mBulletSize = baseSize;
-		mBulletSpeed = baseSpeed * 16;
+		mBulletSpeed = baseSpeed * 16 * 2;
 
 		mMinObstacleSize = baseSize * 2;
 		mMaxObstacleSize = baseSize * 12;
@@ -223,10 +226,16 @@ public class GameView extends View {
 		}
 		
 		long elapsedTime = System.currentTimeMillis() - mShips[id].lastFire;
+
+		int numPlayers = 0;
+		for (int i = 1; i< MAX_PLAYERS; i++)
+			if (mShips[i] !=null)
+				numPlayers++;
+		long delaymod = FIRE_DELAY * numPlayers;
 				
 		//fire with a
 		if (msg.get_a()){
-			if (mShips[id] != null  && elapsedTime > FIRE_DELAY && !mShips[id].isDestroyed()){
+			if (mShips[id] != null  && elapsedTime > delaymod && !mShips[id].isDestroyed()){
 				Bullet bullet = new Bullet(mShips[id], mBulletSpeed);
 				mShips[id].lastFire = System.currentTimeMillis();
 				mBullets.add(bullet);
@@ -245,7 +254,8 @@ public class GameView extends View {
 			else
 				ry = (float) ((float)(msg.get_ry()-32768.0)/32768.0 * -1);//get_lx is 0 - 65535 we need -1 to +1
 		
-			if (pythag(rx,ry)>0.3 && mShips[id] != null && elapsedTime > FIRE_DELAY && !mShips[id].isDestroyed()) {
+			if (pythag(rx,ry)>0.3 && mShips[id] != null && elapsedTime > delaymod
+					&& !mShips[id].isDestroyed()) {
 					
 				Bullet bullet = new Bullet(mShips[id], (float)Math.atan2(ry, rx), mBulletSpeed);
 				mShips[id].lastFire = System.currentTimeMillis();
@@ -392,7 +402,7 @@ public class GameView extends View {
 		// Avoid putting them right on top of the ship.
 		int obstacleCap = MAX_OBSTACLES;  //TODO: This is very ghetto
 		if(gameMode == 1)
-			obstacleCap = (int)(MAX_OBSTACLES * 1.9);
+			obstacleCap = (MAX_OBSTACLES * 2);
 		
 		OuterLoop: while (mObstacles.size() < obstacleCap) {
 			final float minDistance = mShipSize * 4;
@@ -401,7 +411,11 @@ public class GameView extends View {
 			float positionX, positionY;
 			int tries = 0;
 			do {
-				int edge = mRandom.nextInt(4);
+				int edge;
+				if (gameMode == 1)
+					edge = 3;
+				else
+					edge = mRandom.nextInt(4);
 				switch (edge) {
 				case 0:
 					positionX = -size;
@@ -409,11 +423,7 @@ public class GameView extends View {
 					break;
 				case 1:
 					positionX = getWidth() + size;
-					if(gameMode == 1){
-						positionY = mRandom.nextInt(getHeight());
-					}
-					else
-						positionY = mRandom.nextInt(getHeight());
+					positionY = mRandom.nextInt(getHeight());
 					break;
 				case 2:
 					positionX = mRandom.nextInt(getWidth());
@@ -481,8 +491,7 @@ public class GameView extends View {
 
 		
 		//Draw the scores last, so they're on top
-		highScorePlayer = 0;
-		highScore = 0;
+		int playercount = 0;
 		for (int i = 0; i < numShips; i++){
 			if (mScores[i]!=null) 
 			{	
@@ -494,11 +503,13 @@ public class GameView extends View {
 					highScorePlayer = i;
 					highScore = mScores[i];
 				}
+				playercount++;
 			}
 		}
-		if(highScorePlayer != 0)
-			canvas.drawText("Top: P" + highScorePlayer + ": " + highScore, 10, (numShips + 1) * 25, scorePaint);
-		
+		if(highScorePlayer != 0){
+			scorePaint.setARGB(colors[highScorePlayer][0], colors[highScorePlayer][1], colors[highScorePlayer][2], colors[highScorePlayer][3]);
+			canvas.drawText("Top: P" + highScorePlayer + ": " + highScore, 10, (playercount + 2) * 25, scorePaint);
+		}
 		//draw game mode for debugging
 		scorePaint.setColor(Color.GREEN);
 		scorePaint.setTextSize(20);
@@ -854,9 +865,8 @@ public class GameView extends View {
 			{
 				double darct = Math.atan2(mShips[target].mPositionY - mPositionY,mShips[target].mPositionX - mPositionX);
 				
-					mVelocityX = (float) ( Math.cos(darct) * mBulletSpeed /2);
-					mVelocityY = (float) ( Math.sin(darct) * mBulletSpeed /2 );
-					System.out.println( darct + " " + mVelocityX + " " + mVelocityY);
+					mVelocityX = (float) ( Math.cos(darct) * mBulletSpeed /4); //FIXME
+					mVelocityY = (float) ( Math.sin(darct) * mBulletSpeed /4);
 			}
 			if (!super.step(tau)) {
 				return false;
